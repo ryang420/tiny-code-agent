@@ -1,7 +1,7 @@
 """Shutdown and plan approval protocols."""
 
 import uuid
-from .managers.message_bus import MessageBus
+from ..managers.message_bus import MessageBus
 
 shutdown_requests = {}
 plan_requests = {}
