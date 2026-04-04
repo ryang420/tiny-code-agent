@@ -1,13 +1,10 @@
 """Context compression utilities."""
 
 import json
-import os
 import time
 from pathlib import Path
-from anthropic import Anthropic
 
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ["MODEL_ID"]
+from ..llm import create_response, extract_text
 
 
 def estimate_tokens(messages: list) -> int:
@@ -38,12 +35,11 @@ def auto_compact(messages: list, transcript_dir: Path) -> list:
         for msg in messages:
             f.write(json.dumps(msg, default=str) + "\n")
     conv_text = json.dumps(messages, default=str)[:80000]
-    resp = client.messages.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": f"Summarize for continuity:\n{conv_text}"}],
+    resp = create_response(
+        [{"role": "user", "content": f"Summarize for continuity:\n{conv_text}"}],
         max_tokens=2000,
     )
-    summary = resp.content[0].text
+    summary = extract_text(resp)
     return [
         {"role": "user", "content": f"[Compressed. Transcript: {path}]\n{summary}"},
         {"role": "assistant", "content": "Understood. Continuing with summary context."},

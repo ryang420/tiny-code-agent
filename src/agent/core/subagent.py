@@ -1,11 +1,7 @@
 """Subagent spawning for isolated exploration and work."""
 
-import os
-from anthropic import Anthropic
 from .base_tools import run_bash, run_read, run_write, run_edit
-
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ["MODEL_ID"]
+from ..llm import assistant_message_content, create_response, extract_text
 
 
 def run_subagent(prompt: str, agent_type: str = "Explore") -> str:
@@ -67,27 +63,22 @@ def run_subagent(prompt: str, agent_type: str = "Explore") -> str:
     sub_msgs = [{"role": "user", "content": prompt}]
     resp = None
     for _ in range(30):
-        resp = client.messages.create(
-            model=MODEL, messages=sub_msgs, tools=sub_tools, max_tokens=8000
-        )
-        sub_msgs.append({"role": "assistant", "content": resp.content})
+        resp = create_response(sub_msgs, max_tokens=8000, tools=sub_tools)
+        sub_msgs.append({"role": "assistant", "content": assistant_message_content(resp)})
         if resp.stop_reason != "tool_use":
             break
         results = []
         for b in resp.content:
-            if b.type == "tool_use":
-                h = sub_handlers.get(b.name, lambda **kw: "Unknown tool")
+            if b["type"] == "tool_use":
+                h = sub_handlers.get(b["name"], lambda **kw: "Unknown tool")
                 results.append(
                     {
                         "type": "tool_result",
-                        "tool_use_id": b.id,
-                        "content": str(h(**b.input))[:50000],
+                        "tool_use_id": b["id"],
+                        "content": str(h(**b["input"]))[:50000],
                     }
                 )
         sub_msgs.append({"role": "user", "content": results})
     if resp:
-        return (
-            "".join(b.text for b in resp.content if hasattr(b, "text"))
-            or "(no summary)"
-        )
+        return extract_text(resp) or "(no summary)"
     return "(subagent failed)"

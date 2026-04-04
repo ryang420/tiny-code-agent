@@ -1,18 +1,15 @@
 """Teammate management for multi-agent collaboration."""
 
 import json
-import os
 import threading
 import time
 from pathlib import Path
-from anthropic import Anthropic
 
 from ..core.base_tools import run_bash, run_read, run_write, run_edit
+from ..llm import assistant_message_content, create_response
 from .message_bus import MessageBus
 from .task_manager import TaskManager
 
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
-MODEL = os.environ["MODEL_ID"]
 POLL_INTERVAL = 5
 IDLE_TIMEOUT = 60
 
@@ -163,31 +160,25 @@ class TeammateManager:
                         return
                     messages.append({"role": "user", "content": json.dumps(msg)})
                 try:
-                    response = client.messages.create(
-                        model=MODEL,
-                        system=sys_prompt,
-                        messages=messages,
-                        tools=tools,
-                        max_tokens=8000,
-                    )
+                    response = create_response(messages, max_tokens=8000, system=sys_prompt, tools=tools)
                 except Exception:
                     self._set_status(name, "shutdown")
                     return
-                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "assistant", "content": assistant_message_content(response)})
                 if response.stop_reason != "tool_use":
                     break
                 results = []
                 idle_requested = False
                 for block in response.content:
-                    if block.type == "tool_use":
-                        if block.name == "idle":
+                    if block["type"] == "tool_use":
+                        if block["name"] == "idle":
                             idle_requested = True
                             output = "Entering idle phase."
-                        elif block.name == "claim_task":
-                            output = self.task_mgr.claim(block.input["task_id"], name)
-                        elif block.name == "send_message":
+                        elif block["name"] == "claim_task":
+                            output = self.task_mgr.claim(block["input"]["task_id"], name)
+                        elif block["name"] == "send_message":
                             output = self.bus.send(
-                                name, block.input["to"], block.input["content"]
+                                name, block["input"]["to"], block["input"]["content"]
                             )
                         else:
                             dispatch = {
@@ -200,14 +191,14 @@ class TeammateManager:
                                     kw["path"], kw["old_text"], kw["new_text"]
                                 ),
                             }
-                            output = dispatch.get(block.name, lambda **kw: "Unknown")(
-                                **block.input
+                            output = dispatch.get(block["name"], lambda **kw: "Unknown")(
+                                **block["input"]
                             )
-                        print(f"  [{name}] {block.name}: {str(output)[:120]}")
+                        print(f"  [{name}] {block['name']}: {str(output)[:120]}")
                         results.append(
                             {
                                 "type": "tool_result",
-                                "tool_use_id": block.id,
+                                "tool_use_id": block["id"],
                                 "content": str(output),
                             }
                         )

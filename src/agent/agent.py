@@ -4,9 +4,9 @@
 import json
 import os
 from pathlib import Path
-from anthropic import Anthropic
 
 from .core import run_bash, run_read, run_write, run_edit, run_subagent
+from .llm import assistant_message_content, create_response
 from .managers import (
     BackgroundManager,
     MessageBus,
@@ -22,8 +22,6 @@ from .utils import (
     handle_shutdown_request,
     handle_plan_review,
 )
-
-client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
 MODEL = os.environ["MODEL_ID"]
 
 WORKDIR = Path.cwd()
@@ -366,14 +364,8 @@ def agent_loop(messages: list):
             )
             messages.append({"role": "assistant", "content": "Noted inbox messages."})
         # LLM call
-        response = client.messages.create(
-            model=MODEL,
-            system=SYSTEM,
-            messages=messages,
-            tools=TOOLS,
-            max_tokens=8000,
-        )
-        messages.append({"role": "assistant", "content": response.content})
+        response = create_response(messages, max_tokens=8000, system=SYSTEM, tools=TOOLS)
+        messages.append({"role": "assistant", "content": assistant_message_content(response)})
         if response.stop_reason != "tool_use":
             return
         # Tool execution
@@ -381,27 +373,27 @@ def agent_loop(messages: list):
         used_todo = False
         manual_compress = False
         for block in response.content:
-            if block.type == "tool_use":
-                if block.name == "compress":
+            if block["type"] == "tool_use":
+                if block["name"] == "compress":
                     manual_compress = True
-                handler = TOOL_HANDLERS.get(block.name)
+                handler = TOOL_HANDLERS.get(block["name"])
                 try:
                     output = (
-                        handler(**block.input)
+                        handler(**block["input"])
                         if handler
-                        else f"Unknown tool: {block.name}"
+                        else f"Unknown tool: {block['name']}"
                     )
                 except Exception as e:
                     output = f"Error: {e}"
-                print(f"> {block.name}: {str(output)[:200]}")
+                print(f"> {block['name']}: {str(output)[:200]}")
                 results.append(
                     {
                         "type": "tool_result",
-                        "tool_use_id": block.id,
+                        "tool_use_id": block["id"],
                         "content": str(output),
                     }
                 )
-                if block.name == "TodoWrite":
+                if block["name"] == "TodoWrite":
                     used_todo = True
         # Todo nag reminder
         rounds_without_todo = 0 if used_todo else rounds_without_todo + 1

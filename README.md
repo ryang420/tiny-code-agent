@@ -17,7 +17,7 @@ A modular autonomous code agent for experimentation with multi-agent collaborati
 ```bash
 # Setup
 cp .env.example .env
-# Edit .env to add your ANTHROPIC_API_KEY and MODEL_ID
+# Edit .env to add your provider credentials and MODEL_ID
 
 # Install dependencies
 pip install -r requirements.txt
@@ -48,11 +48,19 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
 ## Configuration
 
 Required environment variables:
-- `ANTHROPIC_API_KEY` - Your Anthropic API key
 - `MODEL_ID` - Model to use (e.g., `claude-sonnet-4-6`)
 
 Optional:
+- `LLM_PROVIDER` - Force `anthropic` or `openai`
+- `ANTHROPIC_API_KEY` - Your Anthropic API key
 - `ANTHROPIC_BASE_URL` - For Anthropic-compatible providers
+- `OPENAI_API_KEY` - Your OpenAI API key
+- `OPENAI_BASE_URL` - For OpenAI-compatible providers
+
+Provider selection:
+- If `LLM_PROVIDER=openai`, requests use OpenAI Chat Completions format.
+- If `LLM_PROVIDER=anthropic`, requests use Anthropic Messages format.
+- If `LLM_PROVIDER` is unset, the app auto-selects OpenAI when `OPENAI_API_KEY` or `OPENAI_BASE_URL` is present; otherwise it uses Anthropic.
 
 See `.env.example` for supported providers and their benchmark scores.
 
