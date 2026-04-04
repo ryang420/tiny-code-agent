@@ -12,6 +12,20 @@ if os.getenv("ANTHROPIC_BASE_URL"):
 from agent.agent import agent_loop, TASK_MGR, TEAM, BUS
 
 
+def _render_assistant_text(message: dict) -> str:
+    """Extract printable text from assistant history entries."""
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return str(content)
+
+
 def main():
     """Run the agent REPL."""
     history = []
@@ -40,6 +54,10 @@ def main():
             continue
         history.append({"role": "user", "content": query})
         agent_loop(history)
+        if history and history[-1].get("role") == "assistant":
+            reply = _render_assistant_text(history[-1])
+            if reply:
+                print(reply)
         print()
 
 
