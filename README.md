@@ -35,7 +35,7 @@ The agent is built with a modular architecture:
 - **Utils**: Context compression and coordination protocols
 - **Agent**: Main loop with tool dispatch and LLM integration
 
-See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation.
+See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
 
 ## REPL Commands
 
